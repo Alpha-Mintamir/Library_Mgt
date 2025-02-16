@@ -1,4 +1,8 @@
-import { users, books, borrows, type User, type InsertUser, type Book, type InsertBook, type Borrow } from "@shared/schema";
+import { users, books, borrows, type User, type InsertUser, type Book, type Borrow } from "@shared/schema";
+import type { z } from "zod";
+import { insertBookSchema } from "@shared/schema";
+
+type InsertBook = z.infer<typeof insertBookSchema>;
 import session from "express-session";
 import { db } from "./db";
 import { eq, and, isNull } from "drizzle-orm";
@@ -82,7 +86,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteBook(id: number): Promise<void> {
-    await db.delete(books).where(eq(books.id, id));
+    return await db.transaction(async (tx) => {
+      // First delete all associated borrows
+      await tx.delete(borrows).where(eq(borrows.bookId, id));
+      // Then delete the book
+      await tx.delete(books).where(eq(books.id, id));
+    });
   }
 
   async getBorrows(userId: number): Promise<Borrow[]> {
@@ -128,7 +137,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(borrows.id, borrowId));
 
     if (!borrow) throw new Error("Borrow record not found");
-    if (borrow.returnDate) throw new Error("Book already returned");
+    if (borrow.status !== "pending") throw new Error("Book already returned");
 
     await db.transaction(async (tx) => {
       const [book] = await tx
@@ -145,7 +154,7 @@ export class DatabaseStorage implements IStorage {
 
       await tx
         .update(borrows)
-        .set({ returnDate: new Date() })
+        .set({ status: "returned", returnDate: new Date() })
         .where(eq(borrows.id, borrowId));
     });
   }

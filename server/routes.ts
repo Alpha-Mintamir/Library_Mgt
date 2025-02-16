@@ -3,13 +3,14 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertBookSchema } from "@shared/schema";
+import { insertBookSchema, type User } from "@shared/schema";
+import { insertBorrowSchema } from "@shared/schema";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: "dgckkacgl",
+  api_key: "928395724243498",
+  api_secret: "V616OAx6j9C2S7NypodCvftAkCc",
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -65,7 +66,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/borrows", requireAuth, async (req, res) => {
-    const { bookId, borrowDate, returnDate } = insertBorrowSchema.parse(req.body);
+    const { bookId, borrowDate, returnDate } = insertBorrowSchema
+      .omit({ userId: true })
+      .parse(req.body);
     const borrow = await storage.borrowBook(
       req.user!.id,
       bookId,
@@ -85,11 +88,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const timestamp = Math.round(new Date().getTime() / 1000);
     const signature = cloudinary.utils.api_sign_request(
       { timestamp },
-      process.env.CLOUDINARY_API_SECRET!
+      "V616OAx6j9C2S7NypodCvftAkCc"
     );
-    res.json({ timestamp, signature, apiKey: process.env.CLOUDINARY_API_KEY, cloudName: process.env.CLOUDINARY_CLOUD_NAME });
+    res.json({ timestamp, signature, apiKey: "928395724243498", cloudName: "dgckkacgl" });
   });
 
   const httpServer = createServer(app);
   return httpServer;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

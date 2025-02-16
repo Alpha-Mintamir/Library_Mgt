@@ -55,8 +55,12 @@ export default function AdminBooks() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Book) => {
       const res = await apiRequest("POST", "/api/books", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create book");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -74,12 +78,17 @@ export default function AdminBooks() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Partial<Book>) => {
+      if (!selectedBook?.id) throw new Error("No book selected");
       const res = await apiRequest(
         "PATCH",
-        `/api/books/${selectedBook?.id}`,
+        `/api/books/${selectedBook.id}`,
         data
       );
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update book");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -99,7 +108,11 @@ export default function AdminBooks() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/books/${id}`);
+      const res = await apiRequest("DELETE", `/api/books/${id}`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to delete book");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/books"] });
@@ -116,19 +129,28 @@ export default function AdminBooks() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      const cloudName = "dgckkacgl";
-      const apiKey = "928395724243498";
-      const timestamp = new Date().getTime();
+      if (!file) throw new Error("No file selected");
+      if (!file.type.startsWith("image/")) throw new Error("Only image files are allowed");
       
+      // Get upload signature
+      const signatureRes = await apiRequest("POST", "/api/upload-signature");
+      if (!signatureRes.ok) {
+        const error = await signatureRes.json();
+        throw new Error(error.message || "Failed to get upload signature");
+      }
+      
+      const { timestamp, signature, apiKey, cloudName } = await signatureRes.json();
+
       // Create form data
       const formData = new FormData();
       formData.append("file", file);
       formData.append("api_key", apiKey);
       formData.append("timestamp", timestamp.toString());
-      
+      formData.append("signature", signature);
+
       // Upload to Cloudinary
       const uploadRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        `https://api.cloudinary.com/v1_1/dgckkacgl/image/upload`,
         {
           method: "POST",
           body: formData,
@@ -137,6 +159,8 @@ export default function AdminBooks() {
 
       const data = await uploadRes.json();
       if (data.error) throw new Error(data.error.message);
+      if (!data.secure_url) throw new Error("Upload failed");
+      
       return data.secure_url;
     },
     onSuccess: (url) => {
