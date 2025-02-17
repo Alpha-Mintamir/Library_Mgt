@@ -1,13 +1,13 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, boolean, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   isAdmin: boolean("is_admin").notNull().default(false),
+  phone: text("phone").notNull()
 });
 
 export const books = pgTable("books", {
@@ -39,35 +39,16 @@ export const borrows = pgTable("borrows", {
   status: text("status").notNull().default("pending"),
 });
 
-// Define relations
-export const usersRelations = relations(users, ({ many }) => ({
-  borrows: many(borrows),
-}));
-
-export const booksRelations = relations(books, ({ many }) => ({
-  borrows: many(borrows),
-}));
-
-export const borrowsRelations = relations(borrows, ({ one }) => ({
-  user: one(users, {
-    fields: [borrows.userId],
-    references: [users.id],
-  }),
-  book: one(books, {
-    fields: [borrows.bookId],
-    references: [books.id],
-  }),
-}));
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  phone: true,  // Added phone field in the schema
 });
 
 export const insertBookSchema = createInsertSchema(books);
-
 export const insertBorrowSchema = createInsertSchema(borrows)
-  .omit({ borrowKey: true, status: true })
+  .omit({ borrowKey: true, status: true } as const)
   .extend({
     borrowDate: z.coerce.date(),
     returnDate: z.coerce.date(),
